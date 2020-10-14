@@ -1,0 +1,265 @@
+/* -- General ---- */
+*{
+    margin:0;
+    padding:0;
+    transition:background .1s ease, background-color .1s ease, color .1s ease;
+}
+body{
+    background-color: var(--v-background-base);
+}
+p, h1, h2, h3, h4, h5, h6, span, a, li, button, textarea, input, label{
+    font-family: Roboto, sans-serif !important;
+    text-decoration: none;
+    font-weight: 400;
+    color:rgba(0,0,0,0.85);
+}
+
+/* -- Forms ---- */
+input, select, textarea {
+    font-size: 14px !important;
+    background: #ffffff;
+    outline: none;
+    padding: 10px 15px;
+    resize: none !important;
+}
+.successMessage {
+    font-weight: 500;
+    font-size: 14px;
+    color: #1dca92;
+}
+.errorMessage {
+    font-weight: 600;
+    font-size: 15px;
+    color: #f06a6a;
+    margin-bottom: 19px;
+    margin-left: 10px;
+}
+.errorMessage li{
+  margin: 3px 15px;
+  color: #f06a6a;
+}
+
+.loginErrorMessages {
+    font-weight: 600;
+    font-size: 15px;
+    color: #ec4e4e;
+    margin-bottom: 12px;
+    margin-left: 14px;
+}
+
+.editProfileInfoErrorMessage {
+    font-weight: 700;
+    font-size: 15px;
+    color: #ec4e4e;
+    margin-bottom: -12px;
+    margin-left: 27px;
+    margin-top: 5px;
+}
+
+/* -- Default Containers ---- */
+#appContainer{
+    position:absolute;
+    left:0;
+    top:0;
+    width:100%;
+    height:100%;
+}
+#pageContent{
+    top:58px;
+    height:calc(100% - 58px);
+    position: relative;
+}
+.floatClear {
+    clear:both;
+}
+.darkToggle {
+    border: 1px solid var(--v-secondary-base);
+    border-radius: 100px;
+    margin: 4px 8px;
+    padding:10px 12px !important;
+    transition: all .25s ease;
+}
+.darkToggle:hover {
+    border: 1px solid var(--v-primary-base)
+}
+.darkToggle label{
+    text-align: right;
+    display: initial !important;
+    padding-right:6px;
+}
+.darkToggle .v-input__slot{
+    padding:0 !important;
+    margin:0 !important;
+}
+.darkToggle .v-messages{
+    display:none;
+}
+
+/* -- Buttons ---- */
+.navBarButton {
+    background-color: #1dca92;
+    color: var(--v-tertiaryText-base);
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 2px solid #1dca92;
+    -webkit-transition: all .2s ease;
+    transition: all .2s ease;
+    border-radius: 100px;
+    padding: 6px 18px;
+    float: right;
+    margin-right: 10px;
+}
+.navBarButton:hover{
+    background: var(--v-component-base);
+    color:#1dca92;
+}
+.genericButton {
+    border-radius: 50px;
+    font-size: 15px;
+    color: #7a7a7a;
+    font-weight: 500;
+    background: #ffffff;
+    border: 2px solid #7a7a7a;
+    cursor: pointer;
+    transition:all 0.2s ease;
+    text-decoration: none;
+}
+.genericButton:hover {
+    background: #7a7a7a;
+    color: #ffffff;
+}
+.genericConfirmButton {
+    border-radius: 50px;
+    font-size: 15px;
+    color: var(--v-primary-base);
+    font-weight: 500;
+    background: var(--v-component-base);
+    border: 2px solid var(--v-primary-base);;
+    cursor: pointer;
+    transition:all 0.2s ease;
+    text-decoration: none;
+}
+.genericConfirmButton:hover {
+    background: var(--v-primary-base);
+    color: var(--v-component-base);
+}
+.genericDeleteButton {
+    border-radius: 50px;
+    font-size: 15px;
+    color: #ee5e5e;
+    font-weight: 500;
+    background: var(--v-component-base);
+    border: 2px solid #ee5e5e;
+    cursor: pointer;
+    transition:all 0.2s ease;
+    text-decoration: none;
+}
+.genericDeleteButton:hover {
+    background: #ee5e5e;
+    color: var(--v-component-base);
+}
+.loginButton {
+    border-radius: 0;
+    background: none;
+    color: #1dca92;
+    font-size: 17px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    outline: initial !important;
+}
+
+/* -- NavBar ---- */
+.navBarContainer {
+    left: 0;
+    top:0;
+    width: 100%;
+    position: fixed;
+    background-color: var(--v-component-base);
+    z-index: 100;
+    box-shadow: 0 3px 4px 0 rgba(0,0,0,0.14), 0 3px 3px -2px rgba(0,0,0,0.12), 0 1px 8px 0 rgba(0,0,0,0.20);
+}
+#appNavLogo{
+    width: 35px;
+    cursor:pointer;
+}
+#globalSearchBarContainer{
+    background-color: var(--v-tertiary-base);
+    width: 550px;
+    border-radius: 30px;
+}
+#globalSearchBarIcon{
+    float: left;
+    fill: var(--v-primaryText-base);
+    width: 22px;
+    height: 22px;
+    padding: 8px 8px 8px 14px;
+    box-sizing: content-box;
+    opacity: 0.6;
+}
+#globalSearchBarInput{
+    float: right;
+    padding: 8px 0;
+    margin-right: 20px;
+    width: calc(100% - 65px);
+    font-size: 15px !important;
+    color:var(--v-primaryText-base);
+}
+#globalSearchBarInput::placeholder{
+    color:var(--v-primaryText-base);
+    opacity: 0.6;
+}
+#globalSearchBarInput:-webkit-autofill,
+#globalSearchBarInput:-webkit-autofill:hover,
+#globalSearchBarInput:-webkit-autofill:focus,
+#globalSearchBarInput:-webkit-autofill:active  {
+    -webkit-box-shadow: 0 0 0 30px var(--v-tertiary-base) inset !important;
+    -webkit-text-fill-color: var(--v-primaryText-base) !important;
+    caret-color: var(--v-primaryText-base) !important;
+}
+
+.loginFormContainer input:focus {
+    border: 1px solid var(--v-primary-base) !important;
+}
+#headerNavToggle{
+    cursor: pointer;
+}
+.navBarLeftCol {
+    margin-left: 30px;
+}
+.navBarLeftColIcon {
+    margin-left: 20px;
+}
+.logoutButton:hover {
+    color: var(--v-component-base) !important;
+}
+/* Hide, show and rearrange elements for mobile */
+@media only screen and (max-width: 1180px) {
+  header .hideNavForMobile{
+    display:none !important;
+  }
+}
+@media only screen and (min-width: 851px) {
+  header .showForMobile{
+    display:none !important;
+  }
+}
+@media only screen and (max-width: 850px) {
+  header .hideForMobile{
+    display:none !important;
+  }
+  header .flexForMobile{
+    flex: 1 0 auto  !important;
+  }
+}
+@media only screen and (max-width: 400px) {
+  header .navBarButton{
+    display:none !important;
+  }
+}
+@media only screen and (max-width: 230px) {
+  header #headerSearchBtn{
+    display:none !important;
+  }
+}

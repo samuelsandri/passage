@@ -1,0 +1,1002 @@
+<template>
+  <div>
+    <div v-bind:class="{'profileBanner': true, 'darkModeBanner': darkModeGlobal}"></div>
+    <v-snackbar v-model="snackbar">{{ errorMessage }}<v-btn color="primary" text @click="snackbar = false" >Close</v-btn></v-snackbar>
+    <div class="activityWrap">
+      <div id="activityPageLeft" class="activityPageColumn">
+        <v-card class="activityContainer" :loading="loadingActivity">
+          <v-row v-if="loadingActivity" justify="center">
+            <h3 class="loadingActivityInfoHeader">Loading Info...</h3>
+          </v-row>
+          <div id="activityPageVisibility" class="activityVisibilityLabel"
+               v-bind:class="{activityVisibilityLabel:true,
+               activityVisibilityLabelRed: visibility === 'private',
+               activityVisibilityLabelOrange: visibility === 'restricted',
+               activityVisibilityLabelGreen: visibility === 'public'}">{{visibility}}
+          </div>
+          <div id="activityPageLocation" class="activityLocationLabel">{{ locationToDisplay }}</div>
+          <h3 id="activityPageTitle" class="activityTitle"> {{ activity_name }} </h3>
+          <div id="activityPageDescription" class="activityDescriptionLabel">{{ description }}</div>
+          <h3 id="activityPageStartDate" class="activityStartLabel" v-if="continuous === false && loaded === true"><b>Starts:</b>
+            {{ start_date }}</h3>
+          <h3 id="activityPageEndDate" class="activityEndLabel" v-if="continuous === false && loaded === true">
+            <b>Ends:</b> {{ end_date }}</h3>
+          <div class="activityPageTypeList" id="activityPageTypeListing" v-if="loaded === true">
+            <span v-for="(a, index) in activity_types" :key="index">
+              <v-chip
+                      color="#c1c1c1"
+                      class="ma-2"
+              >
+                {{a.name}}
+              </v-chip>
+            </span>
+          </div>
+          <v-row no-gutters id="activityAuthor" class="activityAuthorLabel" v-if="loaded === true">
+            <v-chip
+                    v-bind:to="'/profile/'+authorId"
+                    class="ma-2"
+                    color="component"
+            >
+              <v-avatar left>
+                <v-icon color="primaryText">mdi-account-circle</v-icon>
+              </v-avatar>
+              <span style="color:var(--v-primaryText-base);">{{activity_author_firstname + " " + activity_author_lastname }}</span>
+            </v-chip>
+            <v-spacer></v-spacer>
+            <v-chip
+                    class="ma-2"
+                    color="component"
+            >
+              <span style="color:var(--v-primaryText-base);">{{numFollowers}} Follower<span style="color:var(--v-primaryText-base);" v-if="numFollowers !== 1">s</span></span>
+            </v-chip>
+          </v-row>
+          <v-divider></v-divider>
+          <v-row no-gutters justify="center" class="activityPageBottomButtons" v-if="!loadingActivity">
+            <v-btn style="margin: 5px"
+                   v-if="user.profile_id === authorId || userRole === 'creator' || userRole === 'organiser' || user.permission_level > 0"
+                   v-bind:to="'/activity_editing/' + activityId" color="blue" outlined rounded>Edit
+            </v-btn>
+            <v-spacer></v-spacer>
+            <v-btn v-if="!userFollowing" :disabled="this.user.profile_id === this.authorId || userOrganiser || userParticipant" style="margin: 5px"  v-on:click="followCurrentActivity()" color="primary"
+                   outlined rounded :loading="loadingFollowButton">Follow
+            </v-btn>
+            <v-btn v-if="userFollowing" :disabled="this.user.profile_id === this.authorId || userOrganiser || userParticipant" style="margin: 5px"  v-on:click="unFollowCurrentActivity()" elevation="0"
+                   color="primary" flat rounded filled :loading="loadingFollowButton">Unfollow
+            </v-btn>
+          </v-row>
+        </v-card>
+        <v-card :loading="loadingRole" :disabled="roleChanging" class="activityContainer">
+          <div class="resultsDiv">
+            <h3 style="font-size:13px; color: var(--v-primaryText-base);" v-if="!roleChanging">Involvement</h3>
+            <v-skeleton-loader style="margin-bottom:2px;width: 100px;" v-if="roleChanging" ref="skeleton"
+                               type="text"></v-skeleton-loader>
+            <v-skeleton-loader v-if="roleChanging" ref="skeleton" type="heading"></v-skeleton-loader>
+            <h3 style="font-size:17px; font-weight: 500; color: var(--v-primaryText-base);"
+                v-if="userRole === 'creator' && !roleChanging">You are the creator</h3>
+            <h3 style="font-size:17px; font-weight: 500; color: var(--v-primaryText-base);"
+                v-if="(userRole === 'none' || userRole === 'follower') && !roleChanging && !loadingRole">Not
+              Participating</h3>
+            <h3 style="font-size:17px; font-weight: 500; color: var(--v-primaryText-base);"
+                v-if="userRole === 'participant' && !roleChanging">You are a
+              Participant</h3>
+            <h3 style="font-size:17px; font-weight: 500; color: var(--v-primaryText-base);"
+                v-if="userRole === 'organiser' && !roleChanging">You are an
+              Organiser</h3>
+            <v-skeleton-loader v-if="roleChanging" ref="skeleton" boilerplate="false" type="button"
+                               style="position: absolute;right:20px;top:50%;transform:translateY(-50%);width:30px;height:30px;border-radius: 100px"
+            ></v-skeleton-loader>
+            <div v-if="userRole !== 'creator'">
+              <v-menu bottom left v-if="!roleChanging">
+                <template v-slot:activator="{ on, attrs }">
+                  <v-btn
+                      style="position: absolute;right:20px;top:50%;transform:translateY(-50%);"
+                      icon
+                      v-bind="attrs"
+                      v-on="on"
+                  >
+                    <v-icon>mdi-pencil</v-icon>
+                  </v-btn>
+                </template>
+                <v-list>
+                  <v-list-item @click="roleSet('participant')"
+                               v-if="userRole === 'none' || userRole === 'organiser' || userRole === 'follower' || userRole === 'creator'">
+                    <v-list-item-title>Become a Participant</v-list-item-title>
+                  </v-list-item>
+                  <v-list-item @click="roleSet('organiser')"
+                               v-if="(userRole === 'none' || userRole === 'participant' || userRole === 'follower' || userRole === 'creator') && authorId === user.profile_id">
+                    <v-list-item-title>Become an Organiser</v-list-item-title>
+                  </v-list-item>
+                  <v-list-item @click="roleSet('none')" v-if="userRole === 'participant' || userRole === 'organiser'">
+                    <v-list-item-title>Clear Involvement</v-list-item-title>
+                  </v-list-item>
+                </v-list>
+              </v-menu>
+            </div>
+          </div>
+        </v-card>
+        <AchievementsCard v-bind:achievements="achievements" v-bind:loading-results="loadingResults" :snackbar.sync="snackbar"
+                          :errorMessage.sync="errorMessage"/>
+      </div>
+      <div id="activityPageCenter" class="activityPageColumn">
+        <div>
+          <v-card :loading="loadingParticipants" style="border-radius: 15px" class="activityPageCard">
+            <div class="resultsDiv">
+              <h2 class="activityCardTitle">Participants & Organisers</h2>
+              <v-tabs
+                  v-model="previewTabs"
+                  fixed-tabs
+                  id="previewParticipantsOrganisersTabs"
+              >
+                <v-tab
+                    v-for="item in userTabs"
+                    :key="item.tab"
+                >
+                  {{ item.tab }}
+                </v-tab>
+              </v-tabs>
+              <v-tabs-items v-model="previewTabs" id="activityParticipantsOrganisersTabItems">
+                <v-tab-item
+                    v-for="(item, index) in userTabs"
+                    :key="index"
+                >
+                  <v-card flat id="participantOrganiserList">
+                    <div v-if="item.preview.length === 0">
+                      <v-card-text>There are currently no {{ item.tab.toLowerCase() }} for this activity
+                      </v-card-text>
+                    </div>
+                    <div v-else>
+                      <v-list-item two-line v-for="(profile, index) in item.preview" :key="index" link
+                                   @click.stop="">
+                        <v-list-item-content>
+                          <v-list-item-title v-if="profile.middlename != null">
+                            {{ profile.firstname + " " + profile.middlename + " " +
+                            profile.lastname}}
+                          </v-list-item-title>
+                          <v-list-item-title v-else>
+                            {{ profile.firstname + " " + profile.lastname}}
+                          </v-list-item-title>
+                          <v-list-item-subtitle>{{ profile.email }}
+                          </v-list-item-subtitle>
+                        </v-list-item-content>
+                        <div v-if="user.profile_id === authorId || user.permission_level > 0">
+                          <v-menu
+                              transition="slide-y-transition"
+                              bottom
+                              right
+                              :close-on-click="true">
+                            <template v-slot:activator="{ on, attrs }">
+                              <v-btn
+                                  v-bind="attrs"
+                                  v-on="on"
+                                  icon>
+                                <v-icon>mdi-dots-vertical</v-icon>
+                              </v-btn>
+                            </template>
+                            <v-card>
+                              <v-card>
+                                <v-list-item
+                                    v-on:click="editUserActivityRole(item.tab.toLowerCase(), profile.email)">
+                                  <div v-if="item.tab === 'Participants'">
+                                    <v-list-item-title>Move to Organiser
+                                    </v-list-item-title>
+                                  </div>
+                                  <div v-else>
+                                    <v-list-item-title>Move to
+                                      Participants
+                                    </v-list-item-title>
+                                  </div>
+                                </v-list-item>
+                              </v-card>
+                            </v-card>
+                          </v-menu>
+                        </div>
+                      </v-list-item>
+                    </div>
+                  </v-card>
+                </v-tab-item>
+              </v-tabs-items>
+              <v-btn
+                  id="activityPageShowMoreButton"
+                  color="#1cca92"
+                  outlined rounded
+                  @click.stop="showMoreDialog = true"
+              >Show More
+              </v-btn>
+            </div>
+          </v-card>
+
+          <v-dialog
+              v-model="showMoreDialog"
+              max-width="450"
+              id="activityPageMoreParticipantsOrganisersDialog"
+          >
+            <v-card style="border-radius: 15px" :loading="loadingParticipantsOrganisersDialog">
+              <v-tabs
+                  v-model="dialogTab"
+                  fixed-tabs
+              >
+                <v-tab
+                    v-for="item in userTabs"
+                    :key="item.tab"
+                >
+                  {{ item.tab }}
+                </v-tab>
+              </v-tabs>
+              <v-tabs-items v-model="dialogTab">
+                <v-tab-item
+                    v-for="item in userTabs"
+                    :key="item.tab"
+                >
+                  <div style="overflow-y: scroll; height: 500px"
+                  >
+                    <v-card flat
+                    >
+                      <div v-if="item.preview.length === 0">
+                        <v-card-text>There are currently no {{
+                          item.tab.toLowerCase() }} for this activity
+                        </v-card-text>
+                      </div>
+                      <div v-else>
+                        <v-list-item two-line v-for="(profile, index) in item.content"
+                                     :key="index" link>
+                          <v-list-item-content>
+                            <v-list-item-title v-if="profile.middlename != null">
+                              {{ profile.firstname + " " + profile.middlename + " "
+                              + profile.lastname}}
+                            </v-list-item-title>
+                            <v-list-item-title v-else>
+                              {{ profile.firstname + " " + profile.lastname}}
+                            </v-list-item-title>
+                            <v-list-item-subtitle>{{ profile.email }}
+                            </v-list-item-subtitle>
+                          </v-list-item-content>
+                          <div v-if="user.profile_id === authorId || user.permission_level > 0">
+                            <v-menu
+                                transition="slide-transition"
+                                bottom
+                                right
+                                :close-on-click="true"
+                            >
+                              <template v-slot:activator="{ on, attrs }">
+                                <v-btn
+                                    v-bind="attrs"
+                                    v-on="on"
+                                    icon
+                                >
+                                  <v-icon>mdi-dots-vertical</v-icon>
+                                </v-btn>
+                              </template>
+                              <v-card>
+                                <v-list-item
+                                    v-on:click="editUserActivityRole(item.tab.toLowerCase(), profile.email)">
+                                  <div v-if="item.tab === 'Participants'">
+                                    <v-list-item-title>Move to Organiser
+                                    </v-list-item-title>
+                                  </div>
+                                  <div v-else>
+                                    <v-list-item-title>Move to
+                                      Participants
+                                    </v-list-item-title>
+                                  </div>
+                                </v-list-item>
+                              </v-card>
+                            </v-menu>
+                          </div>
+                        </v-list-item>
+                      </div>
+                    </v-card>
+                  </div>
+                </v-tab-item>
+              </v-tabs-items>
+              <v-row justify="center" no-gutters style="padding:15px 0;">
+                <v-card-text v-if="dialogTab === 0">
+                  Showing {{userTabs[0].content.length}} out of {{numParticipants}} results
+                </v-card-text>
+                <v-card-text v-else>
+                  Showing {{userTabs[1].content.length}} out of {{numOrganisers}} results
+                </v-card-text>
+                <v-btn
+                    v-if="(dialogTab === 0 && (userTabs[0].content.length < 50 || user.permission_level > 0)) ||
+                          dialogTab === 1"
+                    color="primary"
+                    outlined rounded
+                    :loading="loadingParticipantsOrganisers"
+                    v-on:click="getMoreResults()"
+                >More Results
+                </v-btn>
+              </v-row>
+            </v-card>
+          </v-dialog>
+          <v-card style="border-radius: 15px" v-if="visibility === 'restricted'" class="activityPageCard pa-5">
+            <h2 class="activityCardTitle">Shared Users</h2>
+            <form class="activityPageCardForm">
+              <v-text-field v-model="emailsToAdd" class="activityPageCardTextField mb-5" label="Add email(s)"
+                            outlined rounded clearable hide-details dense></v-text-field>
+              <v-row style="flex-wrap: nowrap;" no-gutters>
+                <v-col cols="12" class="flex-grow-0 flex-shrink-1">
+                  <v-select class="activityPageCardSelect mr-4" v-model="newRole"
+                            :items="roleOptions" name="roleValue" required label="Role" outlined hide-details dense
+                            rounded></v-select>
+                </v-col>
+                <v-col cols="auto">
+                  <v-btn v-on:click="parseEmails()"  height="40px" color="#1cca92" outlined rounded>Add</v-btn>
+                </v-col>
+              </v-row>
+              <h6 class="activityPageErrorMessage" v-if="displayInvalidInputError">{{ invalidInputErrorMessage}}</h6>
+              <h6 class="editSuccessMessage" v-if="displaySharedUsersSuccessMsg">{{ sharedUsersStatusMsg }}
+              </h6>
+              <div id="usersCard" class="activityPageCardDiv">
+                <v-card flat>
+                  <v-list-item two-line v-for="user in sharedUsers" :key="user[0]">
+                    <v-list-item-content>
+                      <v-list-item-title v-if="user.middlename != null">
+                        {{ user.firstname + " " + user.middlename + " " + user.lastname}}
+                      </v-list-item-title>
+                      <v-list-item-title v-else>
+                        {{ user.firstname + " " + user.lastname}}
+                      </v-list-item-title>
+                      <v-list-item-subtitle>{{ user.email }}</v-list-item-subtitle>
+                    </v-list-item-content>
+                  </v-list-item>
+                </v-card>
+              </div>
+            </form>
+          </v-card>
+        </div>
+      </div>
+      <div id="activityPageRight" class="activityPageColumn">
+        <v-card :loading="mapLoading" class="activityPageMapCard">
+          <div id="profileMap" style="height: 350px"></div>
+          <button v-if="!mapLoading" class="genericConfirmButton profileMapButton" type="button" v-on:click="goToFullMap">Full Map</button>
+        </v-card>
+
+        <v-card style="border-radius: 15px;min-height:0;" class="activityPageCard" :loading="loadingChanges">
+          <div class="resultsDiv">
+            <h2 class="activityCardTitle">Latest Changes</h2>
+            <v-timeline dense clipped v-for="(update, i) in activityChanges.data" :key="i">
+              <v-timeline-item
+                  icon-color="grey lighten-2"
+                  small
+              >
+                <v-row justify="space-between">
+                  <v-col>
+                    <h2 style="font-size:14px;color:grey;font-weight:500;">{{formatDate(update.dateTime)}}</h2>
+                    <ul>
+                      <h2 v-for="(updateText, j) in update.textContext.split('*').slice(1)" :key="j"
+                          style="font-size:15px;color: var(--v-primaryText-base);">
+                        <li style="color: var(--v-primaryText-base);">{{updateText}}</li>
+                      </h2>
+                    </ul>
+                  </v-col>
+                </v-row>
+              </v-timeline-item>
+            </v-timeline>
+            <v-card-text v-if="activityChanges.data !== undefined && activityChanges.data.length === 0"
+                         style="text-align: center">No Changes Yet
+            </v-card-text>
+          </div>
+        </v-card>
+      </div>
+      <div class="floatClear"></div>
+    </div>
+  </div>
+</template>
+
+<script>
+
+  import dateUtil from "@/util/date";
+  import {mapActions, mapGetters} from "vuex";
+  import {apiActivity, apiUser} from "../../api";
+  import AchievementsCard from "./modules/AchievementsCard";
+  import mapStyles from "../../util/mapStyles";
+
+  export default {
+    name: "ActivityPageInfo",
+    components: {
+      AchievementsCard,
+    },
+    props: ['darkModeGlobal'],
+    data() {
+      return {
+        activity_name: "",
+        activity_author_firstname: "",
+        activity_author_lastname: "",
+        continuous: false,
+        description: "",
+        activity_types: [],
+        activityChanges: [],
+        visibility: "",
+        start_date: null,
+        end_date: null,
+        location: null,
+        loaded: false,
+        authorId: null,
+        activityId: null,
+        loadingActivity: true,
+        userFollowing: null,
+        previewTabs: null,
+        dialogTab: null,
+        showMoreDialog: false,
+        snackbar: false,
+        timeout: 2000,
+        errorMessage: "",
+        newRole: "participant",
+        emailsToAdd: "",
+        roleOptions: [
+          {value: "participant", text: "Participant"},
+          {value: "organiser", text: "Organiser"},
+          {value: "follower", text: "Follower"}
+        ],
+        displayInvalidInputError: false,
+        invalidInputErrorMessage: "",
+        participantsPageInfo: {
+          defaultPage: 0, currentPage: 0, defaultSize: 8, currentSize: 8,
+        },
+        organisersPageInfo: {
+          defaultPage: 0, currentPage: 0, defaultSize: 8, currentSize: 8,
+        },
+        userTabs: [
+          {tab: 'Participants', content: [], preview: []},
+          {tab: 'Organisers', content: [], preview: []},
+        ],
+        loadingParticipantsOrganisers: false,
+        loadingParticipantsOrganisersDialog: false,
+        sharedUsers: [],
+        displaySharedUsersSuccessMsg: false,
+        displaySharedUsersErrorMsg: false,
+        sharedUsersStatusMsg: "",
+        currentPage: 0,
+        size: 10,
+        bottom: false,
+        watching: true,
+        numFollowers: 0,
+        numParticipants: 0,
+        numOrganisers: 0,
+        userRole: "none",
+        roleDisabled: true,
+        roleChanging: false,
+        achievements: [],
+        loadingFollowButton: false,
+        locationToDisplay: "",
+        mapLoading: true,
+        mapStyle: "light",
+        loadingResults: true,
+        loadingRole: true,
+        loadingChanges: true,
+        loadingParticipants: true,
+        userParticipant: null,
+        userOrganiser: null,
+      }
+    },
+
+    computed: {
+      ...mapGetters(['activity']),
+      ...mapGetters(['user']),
+    },
+
+    async mounted() {
+      if (!this.user.isLogin) {
+        this.$router.push('/login');
+      } else {
+        await this.loadActivity(); // wait for activity information otherwise map wont load
+        this.getParticipants();
+        this.getOrganisers();
+        this.getStats();
+        this.loadUserRole();
+        this.checkFollowing();
+        this.loadMap();
+      }
+    },
+    watch: {
+      bottom(bottom) {
+        if (bottom && this.watching) {
+          this.currentPage += 1;
+          apiActivity.getSharedUsers(this.activityId, this.currentPage, this.size).then(response => {
+            if (response.data.content.length < this.size) {
+              this.watching = false;
+            }
+            this.sharedUsers = this.sharedUsers.concat(response.data.content);
+          })
+        }
+      }
+    },
+    methods: {
+      ...mapActions(['updateUserDurationActivities', 'updateUserContinuousActivities', 'getActivityUpdates',
+        'getParticipants', 'getOrganisers', 'checkUserActivityVisibility', 'getLocationForActivity']),
+
+      /**
+       * Creates an event handler to check if the theme has changed
+       * @param map
+       */
+      setThemeCheckEvent(map) {
+        let outer = this;
+        window.google.maps.event.addDomListener(window, 'click', function() {
+          map.setOptions({
+            styles: mapStyles[outer.darkModeGlobal ? "dark" : "light"],
+            backgroundColor: '#696969'
+          });
+        });
+      },
+
+      /**
+       * Loads the role of the currently logged in user.
+       */
+      loadUserRole() {
+        apiActivity.getUserRole(this.$route.params.activityId, this.user.profile_id)
+            .then((response) => {
+              this.userRole = response.data.role;
+              this.roleDisabled = false;
+              this.loadingRole = false;
+            }).catch((err) => {
+          this.errorMessage = err;
+          this.snackbar = true;
+          this.roleDisabled = false;
+        });
+      },
+
+      /**
+       * Set the role of the currently logged in user.
+       */
+      roleSet(role) {
+        if (role !== "none" && role !== "participant" && role !== "organiser") {
+          this.errorMessage = "Invalid Role";
+          this.snackbar = true;
+          return;
+        }
+        this.roleChanging = true;
+        if (role === "none") {
+          apiActivity.optOutOfActivityRole(this.$route.params.activityId, this.user.primary_email)
+              .then(() => {
+                this.showMoreDialog = false;
+                this.getOrganisers();
+                this.getParticipants();
+                this.getStats();
+                this.checkFollowing();
+                this.roleChanging = false;
+                this.userRole = role;
+              }).catch((err) => {
+            this.errorMessage = err;
+            this.snackbar = true;
+            this.roleChanging = true;
+          });
+        } else {
+          apiActivity.editUserActivityRole(this.user.profile_id, this.$route.params.activityId, role, this.user.primary_email)
+              .then(() => {
+                this.showMoreDialog = false;
+                this.getOrganisers();
+                this.getParticipants();
+                this.getStats();
+                this.checkFollowing();
+                this.roleChanging = false;
+                this.userRole = role;
+              }).catch((err) => {
+            this.errorMessage = err;
+            this.snackbar = true;
+            this.roleChanging = true;
+          })
+        }
+      },
+
+      /**
+       * Format the received location string, ready to be displayed.
+       */
+      locationFormat() {
+        let city = this.location.city;
+        let state = this.location.state;
+        let country = this.location.country;
+        let streetAddress = this.location.street_address;
+        let outputString = "";
+
+        if (location === null) {
+          outputString = "No Location Set"
+        } else {
+          outputString += streetAddress;
+          if (city !== "") {
+            if (outputString !== "") {
+              outputString += ", "
+            }
+            outputString += city;
+          }
+          if (state !== "") {
+            if (outputString !== "") {
+              outputString += ", "
+            }
+            outputString += state;
+          }
+          if (country !== "") {
+            if (outputString !== "") {
+              outputString += ", "
+            }
+            outputString += country;
+          }
+          if (outputString === "") {
+            outputString = "No Location Set"
+          }
+        }
+        this.locationToDisplay = outputString;
+      },
+
+      /**
+       * Checks if user has scrolled to bottom of card code sourced from: https://codepen.io/mednabouli/pen/EdKzzL
+       */
+      bottomVisible() {
+        const cardScroll = document.getElementById("usersCard");
+        const scrollY = cardScroll.scrollHeight - cardScroll.scrollTop;
+        const height = cardScroll.offsetHeight;
+        const offset = height - scrollY;
+        return offset === 0;
+      },
+
+      /**
+       * Parses the list of emails the user entered by splitting them and removing any extra spaces. Checks each one is
+       * valid by calling validateEmail, and displays an error message stating which email is invalid if any.
+       */
+      async parseEmails() {
+        this.displayInvalidInputError = false;
+        const separators = [' ', ';'];
+        let emails = this.emailsToAdd.split(new RegExp(separators.join('|'), 'g'));
+        let emailsAreCorrect = true;
+        for (let i = 0; i < emails.length; i++) {
+          if (emails[i] === "") {
+            emails.splice(i, 1);
+            i--;
+          }
+        }
+        for (let email of emails) {
+          if (!this.validateEmail(email)) {
+            this.invalidInputErrorMessage = "'" + email + "' is an invalid email address.";
+            this.displayInvalidInputError = true;
+            this.displaySharedUsersSuccessMsg = false;
+            emailsAreCorrect = false;
+            break; // So that the first invalid email is displayed
+          }
+        }
+        if (emailsAreCorrect) {
+          await apiActivity.setActivityMembers(emails, this.newRole, this.authorId, this.activityId)
+              .then(response => {
+                this.sharedUsersStatusMsg = response.data;
+                this.displaySharedUsersSuccessMsg = true;
+                this.currentPage = 0;
+                this.getParticipants();
+                this.getOrganisers();
+                apiActivity.getSharedUsers(this.activityId, this.currentPage, this.size).then(response => {
+                  this.sharedUsers = response.data.content;
+                  this.watching = true;
+                })
+              })
+              .catch(error => {
+                this.errorMessage = error;
+                this.snackbar = true;
+                this.displaySharedUsersSuccessMsg = false;
+                this.invalidInputErrorMessage = "Something went wrong, please check the information provided is correct.";
+                this.displayInvalidInputError = true;
+              })
+        }
+      },
+
+      /**
+       * Checks if an email address is valid. Adapted from
+       * https://www.w3resource.com/javascript/form/email-validation.php
+       */
+      validateEmail(mail) {
+        return /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(mail);
+      },
+
+      /**
+       * Formats the datetime string to the form Aug 4 2020
+       */
+      formatDate(datetime) {
+        let newDate = new Date(datetime);
+        let dateString = newDate.toDateString();
+        dateString = dateString.slice(4);
+        return dateString;
+      },
+
+      /**
+       * Retrieves participants for the activity
+       */
+      async getParticipants() {
+        try {
+          let response = await apiActivity.getParticipants(this.$route.params.activityId, this.participantsPageInfo.currentPage, this.participantsPageInfo.currentSize);
+          for (let i = 0; i < response.data.content.length; i++) {
+            if (this.user.primary_email === response.data.content[i].email) {
+              this.userParticipant = true;
+            }
+          }
+          if (!this.userParticipant) {
+            this.userParticipant = false;
+          }
+          this.userTabs[0].content = response.data.content;
+          this.userTabs[0].preview = this.userTabs[0].content.slice(0, 3);
+          this.loadingParticipants = false;
+        } catch (err) {
+          this.errorMessage = err;
+          this.snackbar = true;
+          this.loadingParticipants = false;
+        }
+      },
+
+      /**
+       * Gets information on number of users
+       */
+      async getStats() {
+        await apiActivity.getActivityStats(this.$route.params.activityId).then(response => {
+          this.numFollowers = response.data.followers;
+          this.numOrganisers = response.data.organisers;
+          this.numParticipants = response.data.participants;
+        })
+      },
+
+      /**
+       * Retrieves organisers for the activity
+       */
+      async getOrganisers() {
+        try {
+          let response = await apiActivity.getOrganisers(this.$route.params.activityId, this.organisersPageInfo.currentPage, this.organisersPageInfo.currentSize);
+          for (let i = 0; i < response.data.content.length; i++) {
+            if (this.user.primary_email === response.data.content[i].email) {
+              this.userOrganiser = true;
+            }
+          }
+          if (this.userOrganiser == null) {
+            this.userOrganiser = false;
+          }
+          this.userTabs[1].content = response.data.content;
+          this.userTabs[1].preview = this.userTabs[1].content.slice(0, 3);
+        } catch (err) {
+          this.errorMessage = err;
+          this.snackbar = true;
+        }
+      },
+
+      /**
+       * Retrieves more participants or organisers for the dialog box
+       */
+      async getMoreResults() {
+        try {
+          this.snackbar = false;
+          this.loadingParticipantsOrganisers = true;
+          if (this.dialogTab === 0) {
+            let response = await apiActivity.getParticipants(this.$route.params.activityId, this.participantsPageInfo.currentPage + 1, this.participantsPageInfo.currentSize);
+            if (response.data.content.length === 0) {
+              this.errorMessage = "No more participants";
+              this.snackbar = true;
+            } else {
+              this.userTabs[0].content = this.userTabs[0].content.concat(response.data.content);
+              this.participantsPageInfo.currentPage += 1;
+            }
+            this.loadingParticipantsOrganisers = false;
+          }
+          if (this.dialogTab === 1) {
+            let response = await apiActivity.getOrganisers(this.$route.params.activityId, this.organisersPageInfo.currentPage + 1, this.organisersPageInfo.currentSize);
+            if (response.data.content.length === 0) {
+              this.errorMessage = "No more organisers";
+              this.snackbar = true;
+            } else {
+              this.userTabs[1].content = this.userTabs[1].content.concat(response.data.content);
+              this.organisersPageInfo.currentPage += 1;
+            }
+            this.loadingParticipantsOrganisers = false;
+          }
+        } catch (err) {
+          this.errorMessage = err;
+          this.snackbar = true;
+        }
+      },
+
+      /**
+       * Edits a user's role from participant to organiser and vice versa
+       */
+      async editUserActivityRole(role, email) {
+        if (this.user.profile_id === this.authorId || this.user.permission_level > 0) {
+          let newRole = "";
+          if (role === "participants") newRole = "organiser"; else newRole = "participant";
+          this.loadingParticipantsOrganisersDialog = true;
+          await apiActivity.editUserActivityRole(this.user.profile_id, this.$route.params.activityId, newRole, email)
+              .then(() => {
+                this.showMoreDialog = false;
+                this.getOrganisers();
+                this.getParticipants();
+                this.roleChanging = false;
+              }).catch((err) => {
+                this.errorMessage = err;
+                this.snackbar = true;
+                this.roleChanging = true;
+              });
+          this.loadingParticipantsOrganisersDialog = false;
+        }
+      },
+
+      /**
+       * Deletes the current activity
+       */
+      async deleteActivity() {
+        try {
+          let response = await apiActivity.deleteActivity(this.user.profile_id, this.$route.params.activityId)
+          response = await apiUser.getUserContinuousActivities(this.user.profile_id)
+          this.updateUserContinuousActivities(response.data);
+          response = await apiUser.getUserDurationActivities(this.user.profile_id)
+          this.updateUserDurationActivities(response.data);
+          this.$router.push("/profile/" + this.authorId);
+        } catch (err) {
+          this.errorMessage = err;
+          this.snackbar = true;
+        }
+      },
+
+      /**
+       * Requests the activity and loads its information
+       */
+      async loadActivity() {
+        if (this.$route.params.activityId == null || this.$route.params.activityId === "") {
+          this.$router.push('/profile');
+        } else {
+          let tempActivityData = await apiActivity.getActivityById(this.$route.params.activityId);
+          this.activityChanges = await apiActivity.getActivityUpdates(this.$route.params.activityId, 0, 5);
+          this.loadingChanges = false;
+          if (tempActivityData === "Invalid permissions") {
+            this.$router.push('/profile');
+          } else {
+            this.activityId = tempActivityData.id;
+            this.activity_name = tempActivityData.activity_name;
+            this.continuous = tempActivityData.continuous;
+            this.description = tempActivityData.description;
+            this.activity_types = tempActivityData.activity_type;
+            this.visibility = tempActivityData.visibility;
+            if (this.visibility === "restricted") {
+              apiActivity.getSharedUsers(this.activityId, this.currentPage, this.size).then(
+                  (response) => {
+                    this.sharedUsers = response.data.content;
+                    document.getElementById("usersCard").addEventListener('scroll', () => {
+                      this.bottom = this.bottomVisible()
+                    });
+                  })
+            }
+            this.start_date = dateUtil.getFormatDate(new Date(tempActivityData.start_time));
+            this.end_date = dateUtil.getFormatDate(new Date(tempActivityData.end_time));
+            this.activity_author_firstname = tempActivityData.author.firstname;
+            this.activity_author_lastname = tempActivityData.author.lastname;
+            this.authorId = tempActivityData.author.profile_id;
+            this.loaded = true;
+            this.loadingActivity = false;
+            this.achievements = tempActivityData.achievements;
+            this.loadingResults = false;
+            this.location = tempActivityData.location;
+            this.locationFormat();
+          }
+        }
+      },
+
+      /**
+       * Checks if user is following current activity and sets userFollowing which is used to determine if
+       * the follow button should be for following or unfollowing
+       */
+      async checkFollowing() {
+        await apiUser.isUserFollowingActivity(this.user.profile_id, this.$route.params.activityId)
+            .then((response) => {
+              this.userFollowing = response.data !== false;
+            })
+            .catch((error) => {
+              if (error.response.status === 404) {
+                this.userFollowing = false;
+              }
+            });
+      },
+      /**
+       * Makes api call to allow a user to follow current activity after follow button is pressed
+       */
+      async followCurrentActivity() {
+        this.loadingFollowButton = true;
+        await apiActivity.followActivity(this.user.profile_id, this.$route.params.activityId).then(response => {
+          if (response.status === 201) {
+            this.userFollowing = true;
+            this.getStats();
+            this.loadingFollowButton = false;
+          }
+        });
+      },
+
+      /**
+       * Makes api call to allow a user to un follow current activity after un follow button is pressed
+       */
+      async unFollowCurrentActivity() {
+        this.loadingFollowButton = true;
+        await apiActivity.unfollowActivity(this.user.profile_id, this.$route.params.activityId).then(response => {
+          if (response.status === 200) {
+            this.userFollowing = false;
+            this.getStats();
+            this.loadingFollowButton = false;
+            this.userRole = "none";
+            this.getParticipants();
+            this.getOrganisers();
+          }
+        });
+      },
+
+      /**
+       * Loads the map onto the page and centres on the activity's location.
+       * Adds a marker on the city's centre.
+       */
+      loadMap() {
+        if (!window.google) {
+          return;
+        }
+        this.geocoder = new window.google.maps.Geocoder();
+
+        let map = new window.google.maps.Map(document.getElementById("profileMap"), {
+          zoom: 9,
+          styles: mapStyles[this.darkModeGlobal ? "dark" : "light"],
+          disableDefaultUI: true,
+          backgroundColor: '#696969'
+        });
+
+        let address = this.location.street_address + ' ' + this.location.city + ' ' + this.location.country;
+        let latLng = new window.google.maps.LatLng(this.location.latitude, this.location.longitude);
+
+        let outer = this;
+        this.geocoder.geocode({'address': address}, function (results, status) {
+          if (status === 'OK') {
+            map.setCenter(latLng);
+            let activityMarkerIcon = {
+              url: outer.pickMarkerImage(outer.visibility, outer.authorId),
+              scaledSize: new window.google.maps.Size(30, 30),
+              origin: new window.google.maps.Point(0, 0),
+              anchor: new window.google.maps.Point(15, 30),
+            };
+            new window.google.maps.Marker({
+              map: map,
+              position: latLng,
+              icon: activityMarkerIcon,
+            });
+            outer.mapLoading = false;
+          } else {
+            this.snackbarText = status;
+            this.snackbarColour = "error";
+            this.snackbar = true;
+            outer.mapLoading = false;
+          }
+        });
+        this.setThemeCheckEvent(map);
+      },
+
+      /**
+       * Routes the user the Map page, adding the coordinates to the URL if the user is not the searchedUser.
+       */
+      goToFullMap() {
+        this.$router.push('/map/activity@' + this.location.latitude + ',' + this.location.longitude);
+      },
+
+      /**
+       * Decides on which marker image to use for an activity
+       */
+      pickMarkerImage(visibility, authorId) {
+        let url;
+        if (visibility === "public") {
+          if (authorId === this.user.profile_id) {
+            url = "https://i.imgur.com/Hz5QgGa.png"
+          } else {
+            url = "https://i.imgur.com/MUWKzz9.png"
+          }
+        } else if (visibility === "restricted") {
+          if (authorId === this.user.profile_id) {
+            url = "https://i.imgur.com/61rB4dm.png"
+          } else {
+            url = "https://i.imgur.com/Y0JUUox.png"
+          }
+        } else if (visibility === "private") {
+          if (authorId === this.user.profile_id) {
+            url = "https://i.imgur.com/jNY9HSw.png"
+          } else {
+            url = "https://i.imgur.com/lanhJgs.png"
+          }
+        }
+        return url;
+      },
+    }
+  }
+</script>
+
+<style scoped>
+  @import "../../../public/styles/pages/activityStyle.css";
+  @import "../../../public/styles/pages/profileStyle.css";
+</style>
